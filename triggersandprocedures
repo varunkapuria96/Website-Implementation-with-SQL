@@ -1,0 +1,109 @@
+Trigger 1: Update number of tickets for agent
+This trigger will increment the number of tickets handled by the agent after a customer query is assigned to him. This will help in keeping a track of the performance of the agent.
+
+CREATE OR REPLACE TRIGGER update_numAgentTickets
+AFTER UPDATE OF AGENTID
+ON CUSTOMER_CARE
+DECLARE
+CURSOR numTicketsCursor IS
+  SELECT agentid, count(*) as numTickets
+    FROM CUSTOMER_CARE cc
+  GROUP BY agentid;
+BEGIN
+    FOR updateNTCounter IN numTicketsCursor LOOP
+       UPDATE AGENTS
+       SET numberOfTickets = updateNTCounter.numTickets
+       WHERE agentid = updateNTCounter.agentid;
+    END LOOP;
+END;
+/
+
+
+Trigger 2: Update wallet balance of customer
+This trigger will update the wallet balance of the customer after he activates a valid gift card from his account. This will be updated only if the gift card has not been activated already.
+
+CREATE OR REPLACE TRIGGER update_walletBalance
+BEFORE INSERT
+ON GIFT_CARD_ACTIVATION
+FOR EACH ROW
+DECLARE
+    gc_amount GIFT_CARDS.amount%type;
+    gc_isactivated GIFT_CARDS.isactivated%type;
+BEGIN 
+       SELECT amount, isactivated
+       INTO gc_amount, gc_isactivated
+       FROM GIFT_CARDS
+       WHERE serialnumber=:new.serialnumber;
+       
+       IF (gc_isactivated='No') THEN 
+           UPDATE CUSTOMERS
+           SET walletBalance = walletBalance + gc_amount
+           WHERE custid = :new.custid; 
+     
+     UPDATE GIFT_CARDS
+           SET isactivated='Yes'
+           WHERE serialnumber = :new.serialnumber;      
+       ELSE
+            raise_application_error(-20008, 'Error: Gift card already activated!');
+       END IF;
+END;
+/
+
+Procedure 1: Smart assignment of customer agents
+This procedure will assign an agent smartly to a customer query. In the future, the priority of the query will be calculated using machine learning algorithms, by mining the text in the query. In this project, we are assigning a priority randomly to the query. The queries with high priority will be handled by agents who have demonstrated high performance in the past (based on the query resolution time), i.e. the quickest agents will be assigned to the high priority queries. For all queries, the agent with the lowest open ticket count will be assigned.
+
+CREATE OR REPLACE PROCEDURE update_AgentID
+    (p_custqueryid IN CUSTOMER_CARE.custqueryid%type) AS
+  
+queryAgent AGENTS.agentid%type;
+randomPriority number;
+CURSOR queryCursor IS
+SELECT custqueryid FROM CUSTOMER_CARE;
+BEGIN
+     --assigning random priority to queries 
+     SELECT round(dbms_random.value(1,3))
+     INTO randomPriority
+     FROM dual;
+     
+     UPDATE CUSTOMER_CARE
+     SET queryPriority= 
+        CASE WHEN randomPriority=1 THEN 'Low'
+        WHEN randomPriority=2 THEN 'Medium'
+        WHEN randomPriority=3 THEN 'High'
+        END
+        WHERE custqueryid=p_custqueryid;
+        
+     IF randomPriority=3 THEN
+     SELECT agentid 
+     INTO queryAgent 
+     FROM
+     (
+       SELECT a.agentid, COUNT(CASE WHEN status='Open' THEN 1 END) AS openTickets,
+       row_number() OVER(ORDER BY COUNT(CASE WHEN status='Open' THEN 1 END)) AS lowestOpenTickets
+       FROM AGENTS a LEFT JOIN CUSTOMER_CARE cc ON a.agentid=cc.agentid
+       WHERE a.agentid IN (
+         SELECT agentid
+         FROM CUSTOMER_CARE 
+         GROUP BY agentid
+         HAVING AVG(RESOLUTIONDATE-QUERYDATE)<=(SELECT AVG(RESOLUTIONDATE-QUERYDATE) FROM CUSTOMER_CARE))
+         GROUP BY a.agentid
+     ) WHERE lowestOpenTickets=1;
+     
+     ELSE
+     SELECT agentid 
+     INTO queryAgent 
+     FROM
+     (
+         SELECT a.agentid, COUNT(CASE WHEN status='Open' THEN 1 END) AS openTickets,
+         row_number() OVER(ORDER BY COUNT(CASE WHEN status='Open' THEN 1 END)) AS lowestOpenTickets
+         FROM AGENTS a LEFT JOIN CUSTOMER_CARE cc ON a.agentid=cc.agentid
+         GROUP BY a.agentid
+     ) WHERE lowestOpenTickets=1;
+     
+     END IF;
+     
+     UPDATE CUSTOMER_CARE
+     SET agentid = queryAgent
+     WHERE custqueryid=p_custqueryid;
+END;
+/
