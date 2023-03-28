@@ -1,0 +1,494 @@
+--AGENTS
+CREATE TABLE AGENTS(
+agentID varchar(10),
+agentFName varchar(100) NOT NULL,
+agentLName varchar(100) NOT NULL,
+contactNo char(10),
+emailOfAgent varchar(100) NOT NULL,
+numberOfTickets int DEFAULT 0,
+constraint check_phone_agent check (regexp_like (contactNo, '[0-9]{10}')),
+CONSTRAINT PK_Agent PRIMARY KEY (agentID)
+);
+ 
+--CLUB_MEMBER
+CREATE TABLE CLUB_MEMBER(
+custID varchar(10),
+membershipStartDate DATE,
+nextPaymentDueOn DATE,
+CONSTRAINT PK_ClubMember PRIMARY KEY (custID),
+CONSTRAINT FK_PK_ClubMember FOREIGN KEY (custID) REFERENCES CUSTOMERS (custID) on delete cascade
+);
+ 
+--COUPONS
+CREATE TABLE COUPONS(
+couponCode varchar(20),
+couponDescription varchar(100),
+couponValidity DATE,
+discount float,
+CONSTRAINT PK_CouponCode PRIMARY KEY (couponCode)
+);
+ 
+--CUSTOMER_ADDRESS
+CREATE TABLE CUSTOMER_ADDRESS(
+addressID varchar(10),
+custID varchar(10),
+city varchar(100) not null,
+country varchar(100) not null,
+defaultAddress char(3) default 'No',
+line1 varchar(100) not null,
+line2 varchar(100),
+state char(2) not null,
+tag varchar(10),
+zipcode char(5),
+constraint cust_add_pkey primary key(addressID),
+constraint cust_add_fkey foreign key(custID) references CUSTOMERS(custID) on delete cascade,
+constraint check_zip check (regexp_like (zipcode, '[0-9]{5}'))
+);
+ 
+--CUSTOMER_CARE
+CREATE TABLE CUSTOMER_CARE(
+custQueryID varchar(10),
+description varchar(100),
+queryType varchar(100),
+querySubType varchar(100),
+status varchar(50) DEFAULT 'Open',
+custID varchar(10),
+agentID varchar(10),
+Constraint check_query CHECK (queryType IN ('Online experience','Store experience', 'Products','Services')),
+Constraint check_querysub CHECK (querySubType IN ('Orders','Replacement','Account','Other','Refund')),
+Constraint check_status CHECK (status IN ('Open','Close','Pending')),
+CONSTRAINT PK_CustomerCare PRIMARY KEY (custQueryID),
+CONSTRAINT FK_CUSTOMERCARE_CUSTOMERS FOREIGN KEY (custID) REFERENCES CUSTOMERS(custID) on delete cascade,
+CONSTRAINT FK_CustomerCare_Agents FOREIGN KEY (agentID) REFERENCES AGENTS(agentID) on delete set null
+);
+ 
+--CUSTOMERS
+CREATE TABLE CUSTOMERS(
+custID varchar(10),
+fName varchar(100) not null,
+lName varchar(100) not null,
+phoneNo char(10) not null,
+email varchar(100) not null unique,
+password varchar(20) not null,
+walletBalance number(8,2) default 0,
+constraint cust_pkey primary key(custID),
+constraint check_phone_cust check (regexp_like (phoneNo, '[0-9]{10}')),
+constraint check_email_cust check (email like '%@%.%'),
+constraint check_pwd_length check (length(password)>=8)
+);
+ 
+--DEALS
+CREATE TABLE DEALS(
+dealID varchar(10),
+dealDescription varchar(100) NOT NULL,
+discountStartDate DATE NOT NULL,
+discountEndDate DATE NOT NULL,
+discountPercentage number(5,2) NOT NULL,
+isMember char(3),
+CONSTRAINT check_isMember CHECK (isMember IN ('Yes', 'No')),
+CONSTRAINT PK_Deals PRIMARY KEY (dealID)
+);
+ 
+--DEALS_ON_PRODUCTS
+CREATE TABLE DEALS_ON_PRODUCTS(
+dealID varchar(10),
+productID varchar(10),
+CONSTRAINT PK_DOP PRIMARY KEY (dealID, productID),
+CONSTRAINT FK_DOP_DEALS FOREIGN KEY (dealID) REFERENCES DEALS(dealID) on delete set null,
+CONSTRAINT FK_DOP_PRODUCTS FOREIGN KEY (productID) REFERENCES PRODUCTS(productID) on delete set null
+);
+ 
+--DEPARTMENTS
+CREATE TABLE DEPARTMENTS(
+deptID varchar(10),
+category varchar(100) NOT NULL,
+subCategory varchar(100) NOT NULL,
+CONSTRAINT PK_DEPT PRIMARY KEY (deptID),
+CONSTRAINT category_types CHECK (category IN ('Power Tools','Hand Tools','Automotive','Welding','Plumbing','Electrical','Hardware','Material Handling','Painting','Lighting','Safety','Home and Security',
+'Lawn and Garden','Air Tools','Generators'))
+);
+ 
+--GIFT_CARDS
+CREATE TABLE GIFT_CARDS(
+serialNumber varchar(20),
+giftCardCode char(16) UNIQUE,
+amount number(3) NOT NULL,
+isActivated char(3) DEFAULT 'No',
+CONSTRAINT  check_Activation CHECK (isActivated IN ('Yes','No')),
+constraint check_giftcard_length check (length(giftCardCode )=16),
+Constraint amount_types CHECK (amount IN ('25','50','75','100')),
+CONSTRAINT PK_GIFT_CARDS PRIMARY KEY (serialNumber),
+CONSTRAINT FK_GIFT_CARDS FOREIGN KEY (serialNumber) REFERENCES ITEMS(serialNumber) on delete cascade
+);
+ 
+--GIFT_CARDS_ACTIVATION
+CREATE TABLE GIFT_CARD_ACTIVATION(
+serialNumber varchar(20),
+custID varchar(10),
+dateOfActivation DATE NOT NULL,
+CONSTRAINT PK_GIFT_CARDS_ACTIVATION PRIMARY KEY (serialNumber , custID),
+CONSTRAINT FK_GIFT_CARDS_ACTIVATION_GIFT_CARDS FOREIGN KEY (serialNumber) REFERENCES GIFT_CARDS(serialNumber) on delete cascade,
+CONSTRAINT FK_GIFT_CARDS_ACTIVATION_CUSTOMERS FOREIGN KEY (custID) REFERENCES CUSTOMERS(custID) on delete cascade
+);
+ 
+ 
+--HFCC
+CREATE TABLE HFCC(
+limit number(6) NOT NULL,
+creditCardNo char(16),
+custID varchar(10),
+CVV char(3),
+validTill DATE NOT NULL,
+appliedOn DATE NOT NULL,
+constraint creditcard_length check (length(creditCardNo)=16),
+constraint cvv_length check (length(CVV )=3),
+CONSTRAINT PK_HFCC PRIMARY KEY (creditCardNo),
+CONSTRAINT FK_HFCC FOREIGN KEY (custID) REFERENCES CUSTOMERS(custID) on delete cascade
+);
+ 
+--ITEMS
+CREATE TABLE ITEMS(
+serialNumber varchar(20),
+availability char(3),
+manufacturingDate DATE,
+productID varchar(10),
+storeID varchar(10),
+CONSTRAINT check_isAvailable CHECK (availability IN ('Yes', 'No')),
+CONSTRAINT PK_ITEMS PRIMARY KEY (serialNumber),
+CONSTRAINT FK_ITEMS_PRODUCTS FOREIGN KEY (productID) REFERENCES PRODUCTS(productID) on delete cascade,
+CONSTRAINT FK_ITEMS_STORES FOREIGN KEY (storeID) REFERENCES STORES(storeID) on delete cascade
+);
+ 
+ 
+--ITEMS_IN_ORDERS
+create table ITEMS_IN_ORDERS
+(
+orderID varchar(50),
+serialNumber varchar(20),
+CONSTRAINT PK_ITEMS_ON_ORDERS PRIMARY KEY (orderID,serialNumber),
+CONSTRAINT FK_ITEMS_ON_ORDERS_ORDERS FOREIGN KEY (orderID) REFERENCES ORDERS(orderID) on delete cascade,
+CONSTRAINT FK_ITEMS_ON_ORDERS_ITEMS FOREIGN KEY (serialNumber) REFERENCES ITEMS(serialNumber) on delete set null
+);
+ 
+--ORDERS
+CREATE TABLE ORDERS(
+orderID varchar(50),
+orderDate DATE NOT NULL,
+orderStatus varchar(20) NOT NULL,
+shippingDate DATE,
+estimatedDeliveryDate DATE NOT NULL,
+actualDeliveryDate DATE,
+paymentMode varchar(20),
+couponDiscount decimal(8,2),
+subtotal decimal(8,2) NOT NULL,
+grandTotal decimal(8,2) NOT NULL,
+couponID varchar(20),
+custID varchar(10),
+shippingID varchar(10),
+CONSTRAINT PK_ORDERS PRIMARY KEY (orderID),
+CONSTRAINT FK_ORDERS_COUPONS FOREIGN KEY (couponID) REFERENCES COUPONS(couponID) on delete set null,
+CONSTRAINT FK_ORDERS_CUSTOMERS FOREIGN KEY (custID) REFERENCES CUSTOMERS(custID) on delete cascade,
+CONSTRAINT FK_ORDERS_SHIPPING FOREIGN KEY (shippingID) REFERENCES SHIPPING_METHOD(shippingID) on delete set null
+);
+ 
+ 
+--PRODUCTS
+CREATE TABLE PRODUCTS(
+productID varchar(10),
+productOverview varchar(1000) NOT NULL,
+pricePerUnit FLOAT NOT NULL,
+productName varchar(100) NOT NULL,
+returnPeriod int NOT NULL,
+reviewID varchar(10),
+deptID varchar(10),
+CONSTRAINT PK_PRODUCTS PRIMARY KEY (productID),
+CONSTRAINT FK_RID_PRODUCTS FOREIGN KEY (reviewID) REFERENCES REVIEW_DETAILS(reviewID) on delete set null,
+CONSTRAINT FK_DID_PRODUCTS FOREIGN KEY (deptID) references DEPARTMENTS(deptID) on delete set null
+);
+ 
+--RETURNS
+CREATE TABLE RETURNS(
+returnID varchar(10),
+returnStatus varchar(20) DEFAULT 'initiated',
+reasonForReturn varchar(150) NOT NULL,
+requestDate DATE NOT NULL,
+returnedDate DATE NOT NULL,
+refundStatus varchar(10) DEFAULT 'initiated',
+serialNumber varchar(20),
+orderID varchar(20),
+Constraint check_returnstatus CHECK (returnStatus IN ('Initiated','In process', 'Completed','Declined','Cancelled')),
+Constraint check_refundstatus CHECK (refundStatus IN ('Initiated','In process', 'Completed','Declined','Cancelled')),
+CONSTRAINT PK_RETURNS PRIMARY KEY (returnID),
+CONSTRAINT FK_RETURNS_ORDERS FOREIGN KEY (orderID) REFERENCES ORDERS(orderID) on delete set null,
+CONSTRAINT FK_RETURNS_ITEMS FOREIGN KEY (serialNumber) REFERENCES ITEMS(serialNumber) on delete set null
+);
+ 
+--REVIEW_DETAILS
+CREATE TABLE REVIEW_DETAILS(
+custID varchar(10),
+description varchar(2000) NOT NULL,
+productID varchar(10),
+ratings int,
+reviewID varchar(10),
+CONSTRAINT ratingsLimit CHECK (ratings BETWEEN 1 and 5),
+CONSTRAINT PK_REVIEW_DETAILS PRIMARY KEY (reviewID),
+CONSTRAINT FK_REVIEW_DETAILS_CUSTOMERS FOREIGN KEY (custID) REFERENCES CUSTOMERS(custID) on delete cascade,
+CONSTRAINT FK_REVIEW_DETAILS_PRODUCTS FOREIGN KEY (productID) REFERENCES PRODUCTS(productID) on delete cascade
+);
+ 
+-- SERVICE_PROFESSIONALS
+CREATE TABLE SERVICE_PROFESSIONALS(
+professionalID varchar(10),
+fName varchar(100) NOT NULL,
+lName varchar(100) NOT NULL,
+contactNo varchar(10),
+companyName varchar(100) NOT NULL,
+constraint check_phone_service_professionals check (regexp_like (contactNo, '[0-9]{10}')),
+CONSTRAINT PK_SERVICE_PROFESSIONALS PRIMARY KEY (professionalID)
+);
+ 
+ 
+-- SERVICE_TYPES
+CREATE TABLE SERVICE_TYPES(
+serviceID varchar(10),
+serviceName varchar(100) NOT NULL,
+price number(5,2) NOT NULL,
+CONSTRAINT checkTypes CHECK (serviceName  IN ('Repair', 'Routine Maintainance', 'Diagnostics', 'Oiling', 'Replacement of Parts', 'Fabrication')),
+CONSTRAINT PK_SERVICE_TYPES PRIMARY KEY (serviceID)
+);
+ 
+ 
+-- SERVICES
+CREATE TABLE SERVICES(
+custID varchar(10),
+professionalID varchar(10),
+serviceID varchar(10),
+bookingID varchar(10),
+bookingDate DATE NOT NULL,
+completionDate DATE,
+CONSTRAINT PK_SERVICES PRIMARY KEY (bookingID),
+CONSTRAINT FK_SERVICES_CUSTOMERS FOREIGN KEY (custID) REFERENCES CUSTOMERS(custID) on delete set null,
+CONSTRAINT FK_SERVICES_SERVICEPROFESSIONAL FOREIGN KEY (professionalID) REFERENCES SERVICE_PROFESSIONALS(professionalID) on delete set null,
+CONSTRAINT FK_SERVICE_SERVICESTYPES FOREIGN KEY (serviceID) REFERENCES SERVICE_TYPES(serviceID) on delete set null
+);
+ 
+ 
+-- SHIPPING_METHOD
+CREATE TABLE SHIPPING_METHOD(
+shippingID varchar(10),
+shippingPrice number(5,2) NOT NULL,
+shippingType varchar(50) NOT NULL,
+CONSTRAINT check_shippingType CHECK (shippingType IN ('Flat Rate', 'Express', 'Truck')),
+CONSTRAINT PK_SHIPPING_METHOD PRIMARY KEY (shippingID)
+);
+ 
+ 
+-- STORE_HOURS
+CREATE TABLE STORE_HOURS(
+dayOfWeek varchar(20),
+openTime TIMESTAMP WITH TIME ZONE NOT NULL,
+closeTime TIMESTAMP WITH TIME ZONE NOT NULL,
+storeID varchar(10),
+CONSTRAINT PK_STORES_HOURS PRIMARY KEY (dayOfWeek, storeID),
+CONSTRAINT FK_STORES_HOURS FOREIGN KEY (storeID) REFERENCES STORES(storeID) on delete cascade
+);
+ 
+ 
+-- STORES
+CREATE TABLE STORES(
+addressLine1 varchar(100) NOT NULL,
+addressLine2 varchar(100),
+city varchar(100) NOT NULL,
+phoneNo char(10) NOT NULL,
+state char(2) NOT NULL,
+storeID varchar(10),
+zipcode varchar(5) NOT NULL,
+Constraint check_state2 CHECK (state IN ('AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY')),
+constraint check_zip_stores check (regexp_like (zipcode, '[0-9]{5}')),
+constraint zip_length check (length(zipcode)=5),
+CONSTRAINT PK_STORES PRIMARY KEY (storeID)
+);
+ 
+ 
+Appendix: SQL Statements for Sequences and Triggers for ID Generation
+--Address ID
+CREATE SEQUENCE addressid_sequence
+MINVALUE 1
+MAXVALUE 2000000;
+
+CREATE OR REPLACE TRIGGER gen_address_id
+  BEFORE INSERT
+  ON CUSTOMER_ADDRESS
+  FOR EACH ROW
+BEGIN
+	:new.addressID :=  to_char(addressid_sequence.NEXTVAL);
+END;
+ 
+--Agent_ID
+CREATE SEQUENCE agentID2_sequence
+MINVALUE 101
+MAXVALUE 999;
+ 
+create or replace TRIGGER gen_agent_id
+  BEFORE INSERT
+  ON AGENTS
+  FOR EACH ROW
+BEGIN
+	:new.agentID :=  to_char(agentID2_sequence.NEXTVAL);
+END;
+ 
+--Coupon_ID
+CREATE SEQUENCE couponid_sequence
+MINVALUE 1
+MAXVALUE 10000;
+ 
+create or replace TRIGGER gen_coupon_id
+  BEFORE INSERT
+  ON COUPONS
+  FOR EACH ROW
+BEGIN
+	:new.couponID :=  to_char(couponid_sequence.NEXTVAL);
+END;
+ 
+--Cust_ID
+CREATE SEQUENCE custid_sequence
+MINVALUE 100001
+MAXVALUE 999999;
+ 
+create or replace TRIGGER gen_cust_id
+  BEFORE INSERT
+  ON CUSTOMERS
+  FOR EACH ROW
+BEGIN
+	:new.custID :=  to_char(custid_sequence.NEXTVAL);
+END;
+ 
+--Customercare_ID
+CREATE SEQUENCE customercareid_sequence
+MINVALUE 1
+MAXVALUE 999999;
+ 
+create or replace TRIGGER gen_customercare_id
+  BEFORE INSERT
+  ON CUSTOMER_CARE
+  FOR EACH ROW
+BEGIN
+	:new.CUSTQUERYID :=  to_char(customercareid_sequence.NEXTVAL);
+END;
+ 
+--Department_ID
+CREATE SEQUENCE deptid_sequence
+MINVALUE 101
+MAXVALUE 999;
+ 
+create or replace TRIGGER gen_department_id
+  BEFORE INSERT
+  ON DEPARTMENTS
+  FOR EACH ROW
+BEGIN
+	:new.deptID :=  to_char(deptid_sequence.NEXTVAL);
+END;
+ 
+--HFCC Number
+CREATE SEQUENCE HFCCnumber_sequence
+MINVALUE 1000000000000000
+MAXVALUE 9999999999999999;
+ 
+CREATE OR REPLACE TRIGGER hfcc_num_id
+  BEFORE INSERT
+  ON HFCC
+  FOR EACH ROW
+BEGIN
+	:new.creditcardno :=  to_char(HFCCnumber_sequence.NEXTVAL);
+END;
+ 
+--Order_ID
+CREATE SEQUENCE productid_sequence
+MINVALUE 1
+MAXVALUE 10000000000000;
+ 
+create or replace TRIGGER gen_order_id
+  BEFORE INSERT
+  ON ORDERS
+  FOR EACH ROW
+BEGIN
+	:new.orderID :=  to_char(orderID_sequence.NEXTVAL);
+END;
+ 
+--Product_ID
+CREATE SEQUENCE productid_sequence
+MINVALUE 1001
+MAXVALUE 9999;
+ 
+create or replace TRIGGER gen_product_id
+  BEFORE INSERT
+  ON PRODUCTS
+  FOR EACH ROW
+BEGIN
+	:new.productID :=  to_char(productid_sequence.NEXTVAL);
+END;
+ 
+--Service_ID
+CREATE SEQUENCE serviceid_sequence
+MINVALUE 1
+MAXVALUE 999999;
+ 
+create or replace TRIGGER gen_service_id
+  BEFORE INSERT
+  ON SERVICES
+  FOR EACH ROW
+BEGIN
+	:new.bookingID :=  to_char(serviceid_sequence.NEXTVAL);
+END;
+ 
+--ServiceProfessionalID
+CREATE SEQUENCE serviceprofessionalid_sequence
+MINVALUE 1
+MAXVALUE 1000;
+ 
+create or replace TRIGGER gen_serviceprofessional_id
+  BEFORE INSERT
+  ON SERVICE_PROFESSIONALS
+  FOR EACH ROW
+BEGIN
+	:new.professionalID :=  to_char(serviceprofessionalid_sequence.NEXTVAL);
+END;
+ 
+--ServiceTypes_ID
+CREATE SEQUENCE servicetypesid_sequence
+MINVALUE 1
+MAXVALUE 100;
+ 
+create or replace TRIGGER gen_servicetypes_id
+  BEFORE INSERT
+  ON SERVICE_TYPES
+  FOR EACH ROW
+BEGIN
+	:new.serviceID :=  to_char(servicetypesid_sequence.NEXTVAL);
+END;
+ 
+--ShippingMethod_ID
+CREATE SEQUENCE shippingmethodid_sequence
+MINVALUE 1
+MAXVALUE 10;
+ 
+create or replace TRIGGER gen_shippingmethod_id
+  BEFORE INSERT
+  ON SHIPPING_METHOD
+  FOR EACH ROW
+BEGIN
+	:new.ShippingID :=  to_char(shippingmethodid_sequence.NEXTVAL);
+END;
+ 
+--Store_ID
+CREATE SEQUENCE storeid_sequence
+MINVALUE 1
+MAXVALUE 9999;
+ 
+create or replace TRIGGER gen_store_id
+  BEFORE INSERT
+  ON STORES
+  FOR EACH ROW
+BEGIN
+	:new.storeID :=  to_char(storeid_sequence.NEXTVAL);
+END;
